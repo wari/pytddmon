@@ -1,7 +1,6 @@
 ﻿#! /usr/bin/env python
 #coding: utf-8
 import os
-import shutil
 import subprocess
 from optparse import OptionParser
 
@@ -9,6 +8,13 @@ def get_log_as_dictionary(path):
     f = open(path, 'r')
     rows = f.readlines()
     f.close()
+    return get_dictionary(rows)
+
+def get_output_as_dictionary(output):
+    rows = output.split('\n')
+    return get_dictionary(rows)
+
+def get_dictionary(rows):
     dict = {}
     for row in rows:
         (name, splitter, value) = row.partition('=')
@@ -37,8 +43,11 @@ def compare_logs(testdir, got, exp):
     compare(testdir, 'green', got, exp)
     compare(testdir, 'total', got, exp)
 
-def compare_logs_in_dir(testdir, outputdir):
-    gotinfo = get_log(outputdir, "pytddmon.log")
+def compare_logs_in_dir(testdir, output=None):
+    if output:
+        gotinfo = get_output_as_dictionary(output)
+    else:
+        gotinfo = get_log(testdir, "pytddmon.log")
     expinfo = get_log(testdir, "expected.log")
     compare_logs(testdir, gotinfo, expinfo)
 
@@ -52,7 +61,8 @@ def get_args(path):
     return content.split()
 
 def run_all():
-    (tmpdir, cleanup) = parse_commandline()
+    output = None
+    clean_test = parse_commandline()
     cwd = os.getcwd()
     pytddmon_path = os.path.join(cwd, "../src/pytddmon.py")
     names = os.listdir(cwd)
@@ -61,23 +71,17 @@ def run_all():
         if os.path.isdir(path):
             os.chdir(path)
             cmdline = ['python', pytddmon_path, "--log-and-exit"]
-            log_path = path
-            if tmpdir:
-                log_path = os.path.join(tmpdir, name)
-                log_name = os.path.join(log_path, 'pytddmon.log')
-                if not os.path.exists(log_path):
-                    os.mkdir(log_path)
-                    touch(log_name)
-                cmdline.extend(['--log-path', log_name])
+            if clean_test:
+                cmdline.append('--stdout')
             args = get_args(path)
             cmdline.extend(args)
             try:
-                subprocess.check_call(cmdline, stdout=None, stderr=None)
+                output = subprocess.check_output(cmdline)
             except:
                 print(" .. in test: " + path + "\n")
-            compare_logs_in_dir(path, log_path)
-            if tmpdir and cleanup:
-                shutil.rmtree(log_path)
+            if not clean_test:
+                output = None
+            compare_logs_in_dir(path, output)
 
     os.chdir(cwd)
 
@@ -87,15 +91,12 @@ def touch(fname, times=None):
 
 def parse_commandline():
     parser = OptionParser()
-    parser.add_option('-t', '--tmpdir', help='Write log files to TMPDIR')
-    parser.add_option('-c',
-                      '--clean-up',
+    parser.add_option('-c', '--clean-tests',
                       action='store_true',
                       default=False,
-                      help='If TMPDIR is defined, then clean up the temporary files and directories created')
-
+                      help='Do not write any output files')
     (options, args) = parser.parse_args()
-    return options.tmpdir, options.clean_up
+    return options.clean_tests
 
 if __name__ == "__main__":
     run_all()

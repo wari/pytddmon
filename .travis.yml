@@ -8,5 +8,4 @@ python:
 
 script:
   - nosetests
-  #  We are not doing the tests below yet due to errors
-  #  - ( cd systest && python ./systest.py -t /tmp -c )
+  - ( cd systest && python ./systest.py -c )
